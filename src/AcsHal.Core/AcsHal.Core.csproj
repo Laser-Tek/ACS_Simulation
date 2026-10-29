@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Vendor-neutral abstractions. Must not reference the ACS library. -->
+
+</Project>

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AcsHal.Core\AcsHal.Core.csproj" />
+    <ProjectReference Include="..\AcsHal.Acs\AcsHal.Acs.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\config\*.json" Link="config\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- The ACS native library (ACSCL_x64.dll) is 64-bit. -->
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      ACS SPiiPlus .NET library. The Runtime Kit copy is updated by every ADK install, so it follows
+      whichever ADK version is installed. To pin a specific version or a renamed DLL, override
+      AcsNetLibPath here or on the command line: dotnet build -p:AcsNetLibPath="...\ACS.SPiiPlusNET6.dll"
+    -->
+    <AcsNetLibPath Condition="'$(AcsNetLibPath)' == ''">C:\Program Files (x86)\ACS Motion Control\SPiiPlus Runtime Kit\CommonFiles\ACS.SPiiPlusNET6.dll</AcsNetLibPath>
+  </PropertyGroup>
+</Project>
