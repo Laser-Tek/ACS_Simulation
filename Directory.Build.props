@@ -10,10 +10,11 @@
 
   <PropertyGroup>
     <!--
-      ACS SPiiPlus .NET library. The Runtime Kit copy is updated by every ADK install, so it follows
-      whichever ADK version is installed. To pin a specific version or a renamed DLL, override
-      AcsNetLibPath here or on the command line: dotnet build -p:AcsNetLibPath="...\ACS.SPiiPlusNET6.dll"
+      ACS SPiiPlus .NET library, checked in under lib\ACS so a fresh clone builds without the ADK.
+      Keep it at the same version as the installed ADK (see lib\ACS\VERSION.txt). To build against
+      the installed copy instead:
+        dotnet build -p:AcsNetLibPath="C:\Program Files (x86)\ACS Motion Control\SPiiPlus Runtime Kit\CommonFiles\ACS.SPiiPlusNET6.dll"
     -->
-    <AcsNetLibPath Condition="'$(AcsNetLibPath)' == ''">C:\Program Files (x86)\ACS Motion Control\SPiiPlus Runtime Kit\CommonFiles\ACS.SPiiPlusNET6.dll</AcsNetLibPath>
+    <AcsNetLibPath Condition="'$(AcsNetLibPath)' == ''">$(MSBuildThisFileDirectory)lib\ACS\ACS.SPiiPlusNET6.dll</AcsNetLibPath>
   </PropertyGroup>
 </Project>

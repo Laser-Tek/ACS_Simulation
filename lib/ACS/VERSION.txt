@@ -1,0 +1,9 @@
+ACS.SPiiPlusNET6.dll - ACS SPiiPlus .NET library (.NET 6+), redistributable per ACS's Runtime Kit redist.txt.
+
+Source:  SPiiPlus ADK Suite v3.13.01, SPiiPlus Runtime Kit\CommonFiles\ACS.SPiiPlusNET6.dll
+MD5:     26d53497ce9a3bc011f655bd81096a45
+
+This copy is only what the build compiles against. At run time the library calls the native
+ACSCL_x64.dll and the User Mode Driver installed by the ADK, so keep this file at the same version
+as the installed ADK. To update: copy ACS.SPiiPlusNET6.dll from
+C:\Program Files (x86)\ACS Motion Control\SPiiPlus Runtime Kit\CommonFiles\ and update this file.

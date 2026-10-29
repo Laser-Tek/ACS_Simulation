@@ -34,15 +34,48 @@ src/
   AcsHal.Acs/          Implementation on the ACS SPiiPlus .NET library
   AcsHal.SmokeTest/    Console check against the simulator or a controller
   AcsHal.Viewer/       WPF app showing the machine through the HAL
+lib/
+  ACS/                 ACS.SPiiPlusNET6.dll (the build compiles against this; see VERSION.txt)
 ```
 
 ## Prerequisites
 
-- .NET SDK 10
-- SPiiPlus ADK Suite (installs the .NET library, the simulator, and the User Mode Driver)
+| Needed for | What |
+|---|---|
+| Building | .NET SDK 10 only. The ACS .NET library is checked in under [lib/ACS](lib/ACS). |
+| Running (simulator or hardware) | SPiiPlus ADK Suite installed (see below) |
 
-The build references `ACS.SPiiPlusNET6.dll` from the SPiiPlus Runtime Kit, which each ADK install
-updates. To use a different copy, set `AcsNetLibPath` in [Directory.Build.props](Directory.Build.props).
+A fresh clone builds with `dotnet build` and no ACS software. To run anything, the ADK must be
+installed: the .NET library calls the native `ACSCL_x64.dll`, which talks to the ACS User Mode Driver
+(`ACSCSRV.exe`), and the simulator itself (`sb4.exe`) runs under that driver. These are installed
+system components, not files the repo can carry.
+
+Keep [lib/ACS](lib/ACS) at the same version as the installed ADK. After upgrading the ADK, copy
+`ACS.SPiiPlusNET6.dll` from `C:\Program Files (x86)\ACS Motion Control\SPiiPlus Runtime Kit\CommonFiles\`
+into `lib/ACS` and update `lib/ACS/VERSION.txt`. To build against the installed copy instead, set
+`AcsNetLibPath` in [Directory.Build.props](Directory.Build.props).
+
+## Getting the ACS software (SPiiPlus ADK Suite)
+
+The simulator is not a separate download. It comes with the **SPiiPlus ADK Suite**, which also
+installs MMI Application Studio, the User Mode Driver, the C/.NET libraries, and the documentation
+(`C:\Program Files (x86)\ACS Motion Control\SPiiPlus Documentation Kit`).
+
+| Version | Where it came from |
+|---|---|
+| 4.20.01 (target, matches the controller) | `http://203.74.0.111:82/data/ACS/control/SPiiPlus-ADK-Suite-v.4.20.01.zip` (company file server). 1,935,188,116 bytes, SHA-256 `5a8415feb26994f2a580de4889fb9a4304602c746a1948d8c65154c71b5566e9`. `setup.exe` inside is code-signed by ACS Motion Control Ltd. |
+| 3.13.01 (currently used for development) | Was already installed on the development PC. |
+| Any version | ACS website ([acsmotioncontrol.com](https://acsmotioncontrol.com/capabilities/application-development/mmi-motion-controller-simulator/)); downloads require an ACS account. |
+
+To install:
+
+1. Close MMI Application Studio and anything else connected to the controller or simulator.
+2. Unzip the download and run `setup.exe` as administrator. If it does not offer to upgrade an
+   existing ADK, uninstall the old "SPiiPlus ADK Suite" from Settings > Apps first.
+3. Choose the full install (MMI Application Studio, simulator, libraries, User Mode Driver), and
+   reboot if asked.
+4. Check: connect MMI to **Simulator**, then `dotnet run --project src/AcsHal.SmokeTest`; the
+   firmware line shows the installed version.
 
 ## Build and run
 
@@ -71,6 +104,29 @@ log, an ACSPL+ terminal, and the raw controller axes.
   Disable all and KILL ALL always work.
 - Status is polled every 50 ms with one vector read per variable. All library calls go through one
   lock per connection, because ACS does not document the library as thread-safe.
+
+### Watching the simulator in MMI
+
+Several programs can connect to the simulator at once and all see the same axes. (Tested with the
+viewer plus a second program: moves from either side showed up in the other.) To watch the
+simulator in MMI Application Studio while you use the viewer:
+
+1. Start MMI Application Studio
+   (`C:\Program Files (x86)\ACS Motion Control\SPiiPlus ADK Suite v3.13.01\SPiiPlus MMI Application Studio\ACS.Framework.exe`,
+   or from the Start menu).
+2. Connect to a controller and choose **Simulator** as the connection type.
+3. Open **Motion Manager** for axis positions and states, or **Scope** to plot `FPOS` over time.
+4. Move axes in the viewer and watch MMI follow. It works the other way too: jog in MMI and the
+   viewer's drawing moves.
+
+Things to know:
+
+- MMI shows raw controller axes, not X/Y/Z. In `machine.sim.json`: X = axes 0 + 2, Y = 1 + 3,
+  Z = 4, Theta = 5, Door1 = 6, Door2 = 7.
+- Both programs control the same simulator. Disabling an axis or turning off gantry mode in MMI shows
+  up in the viewer (gantry mode within about a second, which greys out X/Y motion).
+- The simulator keeps its state until it is restarted; positions are not reset when you reconnect.
+- Disconnecting the viewer does not stop the simulator, so MMI stays connected.
 
 Against the simulator, the smoke test moves every axis and checks true-gantry mode. Against a real
 controller it only reads; it never enables or moves anything. The simulator is started

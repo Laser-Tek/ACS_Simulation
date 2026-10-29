@@ -13,7 +13,7 @@
 
   <Target Name="CheckAcsLibrary" BeforeTargets="ResolveAssemblyReferences">
     <Error Condition="!Exists('$(AcsNetLibPath)')"
-           Text="ACS .NET library not found at '$(AcsNetLibPath)'. Install the SPiiPlus ADK Suite or set AcsNetLibPath in Directory.Build.props." />
+           Text="ACS .NET library not found at '$(AcsNetLibPath)'. It should be in lib\ACS; or set AcsNetLibPath in Directory.Build.props." />
   </Target>
 
 </Project>
