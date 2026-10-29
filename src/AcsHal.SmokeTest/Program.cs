@@ -170,28 +170,14 @@ async Task RunSingleAxisTest(IAxis axis, string name)
 
 async Task ProbeGantry(GantryConfig gantry)
 {
-    var cogIndex = config.Axis(gantry.CogAxis).Index;
-    var yawIndex = config.Axis(gantry.YawAxis).Index;
-    var cog = controller.GetAxis(cogIndex);
-    var yaw = controller.GetAxis(yawIndex);
-    var label = $"Gantry {gantry.Name} (COG axis {cogIndex}, yaw axis {yawIndex})";
-
-    // #GANTRY may only be changed while both motors are disabled.
-    TryDisable(cog);
-    TryDisable(yaw);
-    var originalCog = (uint)controller.ReadScalar("MFLAGS", cogIndex);
-    var originalYaw = (uint)controller.ReadScalar("MFLAGS", yawIndex);
+    var g = new GantryAxis(controller, config, gantry);
+    var label = $"Gantry {g.Name} (COG axis {g.Cog.Index}, yaw axis {g.Yaw.Index})";
+    var wasEngaged = g.IsEngaged;
 
     try
     {
-        await cog.WaitEnabledAsync(false, enableTimeout);
-        await yaw.WaitEnabledAsync(false, enableTimeout);
-
-        controller.Transaction($"MFLAGS({cogIndex}).{GantryBit}=1");
-        controller.Transaction($"MFLAGS({yawIndex}).{GantryBit}=1");
-        var gantryOn = HasGantryBit((uint)controller.ReadScalar("MFLAGS", cogIndex))
-                       && HasGantryBit((uint)controller.ReadScalar("MFLAGS", yawIndex));
-        if (!gantryOn)
+        await g.EngageAsync(enableTimeout);
+        if (!g.IsEngaged)
         {
             report.Warn($"{label}: simulator did not keep MFLAGS.#GANTRY set; true gantry cannot be tested here");
             return;
@@ -200,50 +186,38 @@ async Task ProbeGantry(GantryConfig gantry)
 
         // In true-gantry mode the pair is enabled as one motor. If the two axes are not a valid pair on
         // their servo processor, the enable either fails (error 3065) or enables the COG axis alone.
-        // Simulator 3.13.01 quirk: the first ENABLE of a gantry pair often enables only the yaw motor and
-        // reports "motion in progress"; another ENABLE ~100 ms later completes it. ACS's own gantry
-        // example uses a single ENABLE, so real hardware is expected to need no retry.
-        for (var attempt = 1; ; attempt++)
+        try
         {
-            try
-            {
-                cog.Enable();
-                break;
-            }
-            catch (MotionControllerException ex) when (ex.ErrorCode == 3065 && yaw.GetStatus().Enabled && attempt < 3)
-            {
-                report.Warn($"{label}: enable attempt {attempt} only enabled yaw (error 3065); retrying");
-                await Task.Delay(100);
-            }
-            catch (MotionControllerException ex) when (ex.ErrorCode == 3065)
-            {
-                report.Fail($"{label}: enable rejected ({ex.Message}). The axes are probably not a gantry pair on their servo processor");
-                return;
-            }
+            g.Cog.Enable();
         }
-        await cog.WaitEnabledAsync(true, enableTimeout);
+        catch (MotionControllerException ex) when (ex.ErrorCode == 3065)
+        {
+            report.Fail($"{label}: enable rejected ({ex.Message}). The axes are probably not a gantry pair on their servo processor");
+            return;
+        }
+        await g.Cog.WaitEnabledAsync(true, enableTimeout);
         await Task.Delay(300);
-        if (!yaw.GetStatus().Enabled)
+        if (!g.Yaw.GetStatus().Enabled)
         {
             report.Fail($"{label}: yaw stayed disabled when COG was enabled, so gantry mode is not active. The axes are probably not a gantry pair on their servo processor");
             return;
         }
         report.Pass($"{label}: enabling COG also enabled yaw (gantry enable coupling)");
 
-        var cogStart = cog.GetStatus().FeedbackPosition;
-        var yawStart = yaw.GetStatus().FeedbackPosition;
-        cog.SetMotionProfile(testProfile);
-        cog.MoveRelative(TestDistance);
-        await cog.WaitMotionDoneAsync(motionTimeout);
-        var cogMoved = cog.GetStatus().FeedbackPosition - cogStart;
-        var yawDrift = yaw.GetStatus().FeedbackPosition - yawStart;
-        report.Check(Math.Abs(cogMoved - TestDistance) < PositionTolerance && Math.Abs(yawDrift) < PositionTolerance,
-            $"{label}: COG move +{TestDistance} with yaw held",
-            $"COG moved {cogMoved:0.####}, yaw drifted {yawDrift:0.####}");
-        report.Info($"{label}: after move, FPOS({cogIndex})={cog.GetStatus().FeedbackPosition:0.####}, FPOS({yawIndex})={yaw.GetStatus().FeedbackPosition:0.####}");
+        var start = GantryAxis.PositionFrom(true, g.Cog.GetStatus(), g.Yaw.GetStatus());
+        g.Cog.SetMotionProfile(testProfile);
+        g.Cog.MoveRelative(TestDistance);
+        await g.Cog.WaitMotionDoneAsync(motionTimeout);
+        var end = GantryAxis.PositionFrom(true, g.Cog.GetStatus(), g.Yaw.GetStatus());
+        var moved = end.Position - start.Position;
+        var yawDrift = end.Yaw - start.Yaw;
+        report.Check(Math.Abs(moved - TestDistance) < PositionTolerance && Math.Abs(yawDrift) < PositionTolerance,
+            $"{label}: gantry move +{TestDistance} with yaw held",
+            $"moved {moved:0.####}, yaw drifted {yawDrift:0.####}");
+        report.Info($"{label}: after move, position {end.Position:0.####}, yaw {end.Yaw:0.####}");
 
-        cog.MoveRelative(-TestDistance);
-        await cog.WaitMotionDoneAsync(motionTimeout);
+        g.Cog.MoveRelative(-TestDistance);
+        await g.Cog.WaitMotionDoneAsync(motionTimeout);
     }
     catch (Exception ex) when (ex is MotionControllerException or TimeoutException)
     {
@@ -252,18 +226,14 @@ async Task ProbeGantry(GantryConfig gantry)
     finally
     {
         // Leave the simulator as we found it.
-        TryDisable(cog);
-        TryDisable(yaw);
         try
         {
-            await cog.WaitEnabledAsync(false, enableTimeout);
-            await yaw.WaitEnabledAsync(false, enableTimeout);
-            controller.Transaction($"MFLAGS({cogIndex}).{GantryBit}={(HasGantryBit(originalCog) ? 1 : 0)}");
-            controller.Transaction($"MFLAGS({yawIndex}).{GantryBit}={(HasGantryBit(originalYaw) ? 1 : 0)}");
+            if (wasEngaged) await g.EngageAsync(enableTimeout);
+            else await g.ReleaseAsync(enableTimeout);
         }
         catch (Exception ex) when (ex is MotionControllerException or TimeoutException)
         {
-            report.Warn($"{label}: could not restore MFLAGS.#GANTRY: {ex.Message}");
+            report.Warn($"{label}: could not restore gantry mode: {ex.Message}");
         }
     }
 }
@@ -273,8 +243,6 @@ void TryDisable(IAxis axis)
     try { axis.Disable(); }
     catch (MotionControllerException ex) { report.Warn($"Axis {axis.Index}: disable failed: {ex.Message}"); }
 }
-
-static bool HasGantryBit(uint mflags) => (mflags & (1u << GantryBit)) != 0;
 
 static string DescribeMflags(uint mflags)
 {

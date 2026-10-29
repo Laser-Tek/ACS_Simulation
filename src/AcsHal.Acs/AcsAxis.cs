@@ -4,7 +4,7 @@ using AcsHal.Core;
 
 namespace AcsHal.Acs;
 
-internal sealed class AcsAxis(Api api, int index) : IAxis
+internal sealed class AcsAxis(Api api, AcsCall call, int index) : IAxis
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(10);
 
@@ -26,7 +26,24 @@ internal sealed class AcsAxis(Api api, int index) : IAxis
             Faults: (AxisFaults)(uint)Call(() => api.GetFault(_axis), "GetFault"));
     }
 
-    public void Enable() => Call(() => api.Enable(_axis), "Enable");
+    public void Enable()
+    {
+        // Simulator 3.13.01 quirk: the first ENABLE of a true-gantry pair often enables only the yaw
+        // motor and fails with 3065 ("motion in progress"); another ENABLE ~100 ms later completes it.
+        // ACS's own gantry example uses a single ENABLE, so hardware is not expected to hit the retry.
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                Call(() => api.Enable(_axis), "Enable");
+                return;
+            }
+            catch (MotionControllerException ex) when (ex.ErrorCode == 3065 && attempt < 3)
+            {
+                Thread.Sleep(100);
+            }
+        }
+    }
     public void Disable() => Call(() => api.Disable(_axis), "Disable");
     public void ClearFaults() => Call(() => api.FaultClear(_axis), "FaultClear");
 
@@ -85,6 +102,6 @@ internal sealed class AcsAxis(Api api, int index) : IAxis
         }
     }
 
-    private T Call<T>(Func<T> func, string operation) => AcsCall.Run(func, $"Axis {Index}: {operation}");
-    private void Call(Action action, string operation) => AcsCall.Run(action, $"Axis {Index}: {operation}");
+    private T Call<T>(Func<T> func, string operation) => call.Run(func, $"Axis {Index}: {operation}");
+    private void Call(Action action, string operation) => call.Run(action, $"Axis {Index}: {operation}");
 }

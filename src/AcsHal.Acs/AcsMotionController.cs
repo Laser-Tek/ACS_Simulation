@@ -3,10 +3,13 @@ using AcsHal.Core;
 
 namespace AcsHal.Acs;
 
-/// <summary><see cref="IMotionController"/> backed by the ACS SPiiPlus .NET library.</summary>
+/// <summary><see cref="IMotionController"/> backed by the ACS SPiiPlus .NET library. Safe to use from several threads.</summary>
 public sealed class AcsMotionController : IMotionController
 {
+    private const int GantryBit = 25; // MFLAGS.#GANTRY
+
     private readonly Api _api = new();
+    private readonly AcsCall _call = new();
 
     public bool IsConnected { get; private set; }
 
@@ -15,7 +18,7 @@ public sealed class AcsMotionController : IMotionController
         if (IsConnected)
             throw new InvalidOperationException("Already connected.");
 
-        AcsCall.Run(() =>
+        _call.Run(() =>
         {
             switch (connection.Mode)
             {
@@ -33,7 +36,7 @@ public sealed class AcsMotionController : IMotionController
 
         IsConnected = true;
         if (connection.TimeoutMs is int timeout)
-            AcsCall.Run(() => _api.SetTimeout(timeout), "SetTimeout");
+            _call.Run(() => _api.SetTimeout(timeout), "SetTimeout");
     }
 
     public void Disconnect()
@@ -41,17 +44,17 @@ public sealed class AcsMotionController : IMotionController
         if (!IsConnected)
             return;
         IsConnected = false;
-        AcsCall.Run(_api.CloseComm, "CloseComm");
+        _call.Run(_api.CloseComm, "CloseComm");
     }
 
     public ControllerInfo GetInfo()
     {
         EnsureConnected();
-        var firmware = AcsCall.Run(_api.GetFirmwareVersion, "GetFirmwareVersion").Trim();
-        var library = FormatVersion(AcsCall.Run(_api.GetLibraryVersion, "GetLibraryVersion"));
+        var firmware = _call.Run(_api.GetFirmwareVersion, "GetFirmwareVersion").Trim();
+        var library = FormatVersion(_call.Run(_api.GetLibraryVersion, "GetLibraryVersion"));
 
         // Every axis has one FPOS element, so the array length is the number of axes.
-        var fpos = AcsCall.Run(() => _api.ReadVariableAsVector("FPOS", ProgramBuffer.ACSC_NONE, -1, -1, -1, -1), "Read FPOS");
+        var fpos = _call.Run(() => _api.ReadVariableAsVector("FPOS", ProgramBuffer.ACSC_NONE, -1, -1, -1, -1), "Read FPOS");
         var axisCount = fpos is Array array ? array.Length : 1;
 
         return new ControllerInfo(firmware, library, axisCount);
@@ -61,13 +64,50 @@ public sealed class AcsMotionController : IMotionController
     {
         EnsureConnected();
         ArgumentOutOfRangeException.ThrowIfNegative(index);
-        return new AcsAxis(_api, index);
+        return new AcsAxis(_api, _call, index);
     }
+
+    public IReadOnlyList<AxisStatus> GetStatuses(IReadOnlyList<int> indices)
+    {
+        EnsureConnected();
+        if (indices.Count == 0)
+            return [];
+
+        // One vector read per variable over the covered index range, instead of five calls per axis.
+        int from = indices.Min(), to = indices.Max();
+        var (fpos, rpos, fvel, mst, fault) = _call.Run(() => (
+            ReadVector("FPOS", from, to),
+            ReadVector("RPOS", from, to),
+            ReadVector("FVEL", from, to),
+            ReadVector("MST", from, to),
+            ReadVector("FAULT", from, to)), "Read axis status vectors");
+
+        return indices.Select(i =>
+        {
+            var k = i - from;
+            var state = (MotorStates)(int)mst[k];
+            return new AxisStatus(
+                i,
+                FeedbackPosition: fpos[k],
+                ReferencePosition: rpos[k],
+                FeedbackVelocity: fvel[k],
+                Enabled: state.HasFlag(MotorStates.ACSC_MST_ENABLE),
+                Moving: state.HasFlag(MotorStates.ACSC_MST_MOVE),
+                InPosition: state.HasFlag(MotorStates.ACSC_MST_INPOS),
+                Faults: (AxisFaults)unchecked((uint)(int)fault[k]));
+        }).ToList();
+    }
+
+    public bool GetGantryMode(int index) =>
+        (((uint)ReadScalar("MFLAGS", index) >> GantryBit) & 1) != 0;
+
+    public void SetGantryMode(int index, bool enabled) =>
+        Transaction($"MFLAGS({index}).{GantryBit}={(enabled ? 1 : 0)}");
 
     public double ReadScalar(string variable, int index = -1)
     {
         EnsureConnected();
-        var value = AcsCall.Run(() => _api.ReadVariableAsScalar(variable, ProgramBuffer.ACSC_NONE, index, -1), $"Read {variable}");
+        var value = _call.Run(() => _api.ReadVariableAsScalar(variable, ProgramBuffer.ACSC_NONE, index, -1), $"Read {variable}");
         return Convert.ToDouble(value);
     }
 
@@ -75,19 +115,19 @@ public sealed class AcsMotionController : IMotionController
     {
         EnsureConnected();
         // The library returns null, not "", for commands without a reply (e.g. ENABLE).
-        return AcsCall.Run(() => _api.Transaction(command), $"Transaction '{command}'") ?? string.Empty;
+        return _call.Run(() => _api.Transaction(command), $"Transaction '{command}'") ?? string.Empty;
     }
 
     public void DisableAll()
     {
         EnsureConnected();
-        AcsCall.Run(_api.DisableAll, "DisableAll");
+        _call.Run(_api.DisableAll, "DisableAll");
     }
 
     public void KillAll()
     {
         EnsureConnected();
-        AcsCall.Run(_api.KillAll, "KillAll");
+        _call.Run(_api.KillAll, "KillAll");
     }
 
     public void Dispose()
@@ -100,6 +140,15 @@ public sealed class AcsMotionController : IMotionController
     {
         if (!IsConnected)
             throw new InvalidOperationException("Not connected to the controller.");
+    }
+
+    // Integer variables (MST, FAULT) come back as int[], real ones as double[]; both widen to double.
+    private double[] ReadVector(string variable, int from, int to)
+    {
+        var value = _api.ReadVariableAsVector(variable, ProgramBuffer.ACSC_NONE, from, to, -1, -1);
+        return value is Array array
+            ? array.Cast<object>().Select(Convert.ToDouble).ToArray()
+            : [Convert.ToDouble(value)];
     }
 
     // The library packs its version one byte per field, e.g. 0x030D0100 => 3.13.1.0.

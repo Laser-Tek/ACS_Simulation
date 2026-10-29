@@ -7,21 +7,21 @@
   //   Y gantry: Y1 = 1 (COG), Y2 = 3 (yaw)
   // The real controller will likely pair differently; see machine.hw.json.
   //
-  // Mechanics match machine.hw.json. The simulator stores EFAC but does not rescale positions with it.
+  // Mechanics and travel match machine.hw.json (placeholders). The simulator stores EFAC but does not rescale positions with it.
 
   "connection": {
     "mode": "Simulator"
   },
 
   "axes": [
-    { "name": "X1",    "index": 0, "kind": "Linear", "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
-    { "name": "Y1",    "index": 1, "kind": "Linear", "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
-    { "name": "X2",    "index": 2, "kind": "Linear", "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
-    { "name": "Y2",    "index": 3, "kind": "Linear", "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
-    { "name": "Z",     "index": 4, "kind": "Linear", "mechanics": { "type": "BallScrew", "leadMm": 5, "countsPerMotorRev": 131072 } },
-    { "name": "Theta", "index": 5, "kind": "Linear", "mechanics": { "type": "BallScrew", "leadMm": 5, "countsPerMotorRev": 131072 } },
-    { "name": "Door1", "index": 6, "kind": "Door" },
-    { "name": "Door2", "index": 7, "kind": "Door" }
+    { "name": "X1",    "index": 0, "kind": "Linear", "travel": { "min": 0, "max": 600 }, "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
+    { "name": "Y1",    "index": 1, "kind": "Linear", "travel": { "min": 0, "max": 500 }, "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
+    { "name": "X2",    "index": 2, "kind": "Linear", "travel": { "min": 0, "max": 600 }, "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
+    { "name": "Y2",    "index": 3, "kind": "Linear", "travel": { "min": 0, "max": 500 }, "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
+    { "name": "Z",     "index": 4, "kind": "Linear", "travel": { "min": 0, "max": 50 }, "mechanics": { "type": "BallScrew", "leadMm": 5, "countsPerMotorRev": 131072 } },
+    { "name": "Theta", "index": 5, "kind": "Linear", "travel": { "min": 0, "max": 20 }, "mechanics": { "type": "BallScrew", "leadMm": 5, "countsPerMotorRev": 131072 } },
+    { "name": "Door1", "index": 6, "kind": "Door", "travel": { "min": 0, "max": 300 } },
+    { "name": "Door2", "index": 7, "kind": "Door", "travel": { "min": 0, "max": 300 } }
   ],
 
   "gantries": [

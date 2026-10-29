@@ -33,6 +33,7 @@ src/
   AcsHal.Core/         Vendor-neutral interfaces and config (IMotionController, IAxis, MachineConfig)
   AcsHal.Acs/          Implementation on the ACS SPiiPlus .NET library
   AcsHal.SmokeTest/    Console check against the simulator or a controller
+  AcsHal.Viewer/       WPF app showing the machine through the HAL
 ```
 
 ## Prerequisites
@@ -50,6 +51,26 @@ dotnet build
 dotnet run --project src/AcsHal.SmokeTest                            # simulator (default)
 dotnet run --project src/AcsHal.SmokeTest -- config/machine.hw.json  # real controller, read-only
 ```
+
+Or open `AcsHal.sln` in Visual Studio and pick a startup project.
+
+### Viewer
+
+```
+dotnet run --project src/AcsHal.Viewer
+```
+
+Pick a config and press Connect. The viewer shows the machine as the HAL sees it: the XY table from
+above (click it to move there), Z/Theta/door stroke bars, and a card per machine axis (X and Y as
+gantries) with enable, jog (hold), move-to, halt and gantry engage/release. The bottom panel has the
+log, an ACSPL+ terminal, and the raw controller axes.
+
+- Simulator: on connect, all axes are disabled, EFAC is applied from the config, and both gantries
+  are engaged. Motion is allowed only on engaged gantries, so one side is never moved alone.
+- Hardware: read-only. Motion buttons are disabled and the terminal only sends `?` queries;
+  Disable all and KILL ALL always work.
+- Status is polled every 50 ms with one vector read per variable. All library calls go through one
+  lock per connection, because ACS does not document the library as thread-safe.
 
 Against the simulator, the smoke test moves every axis and checks true-gantry mode. Against a real
 controller it only reads; it never enables or moves anything. The simulator is started

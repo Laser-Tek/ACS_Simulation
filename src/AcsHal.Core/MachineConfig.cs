@@ -19,6 +19,8 @@ public sealed record ConnectionConfig
     public int? TimeoutMs { get; init; }
 }
 
+public sealed record TravelRange(double Min, double Max);
+
 public sealed record AxisConfig
 {
     public required string Name { get; init; }
@@ -27,6 +29,9 @@ public sealed record AxisConfig
 
     /// <summary>Drive mechanics; null while not yet known (scaling is then not checked).</summary>
     public AxisMechanics? Mechanics { get; init; }
+
+    /// <summary>Stroke in controller units; null while not yet known.</summary>
+    public TravelRange? Travel { get; init; }
 
     public MotionProfile? Motion { get; init; }
 }
@@ -82,7 +87,11 @@ public sealed record MachineConfig
             throw new InvalidDataException($"Axis index {duplicateIndex.Key} is used by {string.Join(", ", duplicateIndex.Select(a => a.Name))}.");
 
         foreach (var axis in Axes)
+        {
             axis.Mechanics?.Validate(axis.Name);
+            if (axis.Travel is { } travel && !(travel.Min < travel.Max))
+                throw new InvalidDataException($"Axis '{axis.Name}': travel.min must be less than travel.max.");
+        }
 
         foreach (var gantry in Gantries)
         {

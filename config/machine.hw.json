@@ -3,8 +3,9 @@
   // Axis indices and the IP address are PLACEHOLDERS until checked against the real controller
   // (MMI > System Setup). The smoke test only reads from hardware; it never moves anything.
   //
-  // Positions are in mm. "mechanics" gives the encoder scale the controller must use (EFAC, set and
-  // saved in MMI during commissioning); the HAL verifies it on connect but does not write it here.
+  // Positions are in mm; "travel" ranges are placeholders (TBD). "mechanics" gives the encoder scale
+  // the controller must use (EFAC, set and saved in MMI during commissioning); the HAL verifies it on
+  // connect but does not write it here.
 
   "connection": {
     "mode": "Ethernet",
@@ -14,19 +15,19 @@
 
   "axes": [
     // X/Y gantries: linear motors, one linear encoder per motor. TBD: encoder resolution.
-    { "name": "X1",    "index": 0, "kind": "Linear", "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
-    { "name": "X2",    "index": 1, "kind": "Linear", "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
-    { "name": "Y1",    "index": 2, "kind": "Linear", "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
-    { "name": "Y2",    "index": 3, "kind": "Linear", "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
+    { "name": "X1",    "index": 0, "kind": "Linear", "travel": { "min": 0, "max": 600 }, "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
+    { "name": "X2",    "index": 1, "kind": "Linear", "travel": { "min": 0, "max": 600 }, "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
+    { "name": "Y1",    "index": 2, "kind": "Linear", "travel": { "min": 0, "max": 500 }, "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
+    { "name": "Y2",    "index": 3, "kind": "Linear", "travel": { "min": 0, "max": 500 }, "mechanics": { "type": "LinearMotor", "encoderResolutionMm": 0.0001 } },
 
     // Z and Theta: rotary servo motor driving a ball screw, controlled in mm of screw travel.
     // TBD: screw lead, motor encoder counts/rev, gearing; Z brake / safe height.
-    { "name": "Z",     "index": 4, "kind": "Linear", "mechanics": { "type": "BallScrew", "leadMm": 5, "countsPerMotorRev": 131072 } },
-    { "name": "Theta", "index": 5, "kind": "Linear", "mechanics": { "type": "BallScrew", "leadMm": 5, "countsPerMotorRev": 131072 } },
+    { "name": "Z",     "index": 4, "kind": "Linear", "travel": { "min": 0, "max": 50 }, "mechanics": { "type": "BallScrew", "leadMm": 5, "countsPerMotorRev": 131072 } },
+    { "name": "Theta", "index": 5, "kind": "Linear", "travel": { "min": 0, "max": 20 }, "mechanics": { "type": "BallScrew", "leadMm": 5, "countsPerMotorRev": 131072 } },
 
     // Doors: servo motors. TBD: drive mechanism (screw/belt), open/closed positions, interlocks.
-    { "name": "Door1", "index": 6, "kind": "Door" },
-    { "name": "Door2", "index": 7, "kind": "Door" }
+    { "name": "Door1", "index": 6, "kind": "Door", "travel": { "min": 0, "max": 300 } },
+    { "name": "Door2", "index": 7, "kind": "Door", "travel": { "min": 0, "max": 300 } }
   ],
 
   // True gantry (MFLAGS.#GANTRY): needs two identical motors with identical encoders, both on the
