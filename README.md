@@ -36,6 +36,8 @@ src/
   AcsHal.Viewer/       WPF app showing the machine through the HAL
 lib/
   ACS/                 ACS.SPiiPlusNET6.dll (the build compiles against this; see VERSION.txt)
+docs/
+  to-do-after-simulation.md   Steps from simulator to the real machine
 ```
 
 ## Prerequisites
@@ -159,3 +161,6 @@ MMI > System Setup before filling in `machine.hw.json`.
 - Door mechanism (screw/belt), open/closed positions, and interlocks; Z brake and safe height
 - Real axis numbering and controller IP
 - Firmware version on the controller (target ADK: 4.20.01)
+
+For the steps from the simulator to the real machine, see
+[docs/to-do-after-simulation.md](docs/to-do-after-simulation.md).
